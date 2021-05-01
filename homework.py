@@ -38,7 +38,7 @@ def parse_homework_status(homework):
 
 
 def get_homework_statuses(current_timestamp):
-    data = {"from_date": 0}
+    data = {"from_date": current_timestamp}
     headers = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
     homework_statuses = requests.get(
         'https://praktikum.yandex.ru/api/user_api/homework_statuses/',
