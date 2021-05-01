@@ -13,14 +13,17 @@ load_dotenv()
 PRAKTIKUM_TOKEN = os.getenv("PRAKTIKUM_TOKEN")
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+LOG_FILE_FORMAT = '%(asctime)s, %(levelname)s, %(name)s, %(message)s'
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s, %(levelname)s, %(name)s, %(message)s',
+    format=LOG_FILE_FORMAT,
 )
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = RotatingFileHandler('main.log', maxBytes=50000000, backupCount=5)
+formatter = logging.Formatter(LOG_FILE_FORMAT)
+handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
@@ -30,12 +33,12 @@ def parse_homework_status(homework):
         verdict = 'К сожалению в работе нашлись ошибки.'
     else:
         verdict = ('Ревьюеру всё понравилось, '
-            'можно приступать к следующему уроку.')
+                    'можно приступать к следующему уроку.')
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
 def get_homework_statuses(current_timestamp):
-    data = {"from_date": current_timestamp}
+    data = {"from_date": 0}
     headers = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
     homework_statuses = requests.get(
         'https://praktikum.yandex.ru/api/user_api/homework_statuses/',
@@ -53,7 +56,7 @@ def send_message(message, bot_client):
 
 def main():
     # проинициализировать бота здесь
-    logging.debug('Начало работы')
+    logger.debug('Начало работы')
     bot_client = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())  # начальное значение timestamp
 
@@ -65,7 +68,7 @@ def main():
                     new_homework.get('homeworks')[0]),
                     bot_client
                 )
-                logging.info('Отправка сообщения')
+                logger.info('Отправка сообщения')
             current_timestamp = new_homework.get(
                 'current_date',
                 current_timestamp
