@@ -17,7 +17,6 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s, %(levelname)s, %(name)s, %(message)s',
-    filename='main.log',
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -31,8 +30,7 @@ def parse_homework_status(homework):
         verdict = 'К сожалению в работе нашлись ошибки.'
     else:
         verdict = ('Ревьюеру всё понравилось, '
-            'можно приступать к следующему уроку.'
-        )
+            'можно приступать к следующему уроку.')
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
