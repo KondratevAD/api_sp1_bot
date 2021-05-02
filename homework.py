@@ -10,9 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-PRAKTIKUM_TOKEN = os.getenv("PRAKTIKUM_TOKEN")
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+PRAKTIKUM_TOKEN = os.environ['PRAKTIKUM_TOKEN']
+TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
+TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
+API_HOMEWORK = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
+SERVER_POLLING = 300   # опрашивать раз в пять минут
 LOG_FILE_FORMAT = '%(asctime)s, %(levelname)s, %(name)s, %(message)s'
 
 logging.basicConfig(
@@ -28,55 +30,67 @@ logger.addHandler(handler)
 
 
 def parse_homework_status(homework):
+    homework_status_options = {
+        'reviewing': 'Работа взята на проверку.',
+        'approved': ('Ревьюеру всё понравилось, '
+                   'можно приступать к следующему уроку.'),
+        'rejected': 'К сожалению в работе нашлись ошибки.'
+    }
     homework_name = homework.get('homework_name')
-    if homework.get('status') == 'rejected':
-        verdict = 'К сожалению в работе нашлись ошибки.'
+    homework_status = homework.get('status')
+    log_error = f'Имя работы: {homework_name}, статус работы: {homework_status}'
+    if (homework_name == None) or (homework_status == None):
+        logger.error(log_error)
+        return f'Ошибка обращения к серверу, смотри логи.'
+    elif homework_status in homework_status_options:
+        verdict = homework_status_options[homework_status]
+        return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
+    elif homework_status not in homework_status_options:
+        logger.error(log_error)
+        return f'Неизвестный статус домашнего задания.'
     else:
-        verdict = ('Ревьюеру всё понравилось, '
-                   'можно приступать к следующему уроку.')
-    return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
+        return f'Со мной что-то не так, я заболел.'
 
 
 def get_homework_statuses(current_timestamp):
-    data = {"from_date": current_timestamp}
+    data = {"from_date": 0}
     headers = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
     homework_statuses = requests.get(
-        'https://praktikum.yandex.ru/api/user_api/homework_statuses/',
+        API_HOMEWORK,
         params=data,
         headers=headers,
     )
+    logger.info(f'Ответ сервера: {homework_statuses.json()}')
     return homework_statuses.json()
 
 
 def send_message(message, bot_client):
-    chat_id = TELEGRAM_CHAT_ID
-    text = message
-    return bot_client.send_message(chat_id, text)
+    return bot_client.send_message(TELEGRAM_CHAT_ID, message)
 
 
 def main():
     # проинициализировать бота здесь
-    logger.debug('Начало работы')
+    logger.debug(f'Начало работы')
     bot_client = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())  # начальное значение timestamp
 
     while True:
         try:
             new_homework = get_homework_statuses(current_timestamp)
+            message = parse_homework_status(new_homework.get('homeworks')[0])
             if new_homework.get('homeworks'):
-                send_message(parse_homework_status(
-                    new_homework.get('homeworks')[0]),
-                    bot_client
-                )
-                logger.info('Отправка сообщения')
+                send_message(message, bot_client)
+                logger.info(f'Отправка сообщения: {message}')
+            else:
+                send_message('Ошибка ответа сервера', bot_client)
             current_timestamp = new_homework.get(
                 'current_date',
                 current_timestamp
             )
-            time.sleep(300)  # опрашивать раз в пять минут
+            time.sleep(SERVER_POLLING)  
+            
 
         except Exception as e:
-            print(f'Бот столкнулся с ошибкой: {e}')
             send_message(f'Ошибка: {e}', bot_client)
             time.sleep(5)
 
