@@ -33,27 +33,28 @@ def parse_homework_status(homework):
     homework_status_options = {
         'reviewing': 'Работа взята на проверку.',
         'approved': ('Ревьюеру всё понравилось, '
-                   'можно приступать к следующему уроку.'),
+                     'можно приступать к следующему уроку.'),
         'rejected': 'К сожалению в работе нашлись ошибки.'
     }
     homework_name = homework.get('homework_name')
     homework_status = homework.get('status')
-    log_error = f'Имя работы: {homework_name}, статус работы: {homework_status}'
-    if (homework_name == None) or (homework_status == None):
+    log_error = (f'Имя работы: {homework_name}',
+                 f'статус работы: {homework_status}')
+    if (homework_name is None) or (homework_status is None):
         logger.error(log_error)
-        return f'Ошибка обращения к серверу, смотри логи.'
+        return 'Ошибка обращения к серверу, смотри логи.'
     elif homework_status in homework_status_options:
         verdict = homework_status_options[homework_status]
         return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
     elif homework_status not in homework_status_options:
         logger.error(log_error)
-        return f'Неизвестный статус домашнего задания.'
+        return 'Неизвестный статус домашнего задания.'
     else:
-        return f'Со мной что-то не так, я заболел.'
+        return 'Со мной что-то не так, я заболел.'
 
 
 def get_homework_statuses(current_timestamp):
-    data = {"from_date": 0}
+    data = {"from_date": current_timestamp}
     headers = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
     homework_statuses = requests.get(
         API_HOMEWORK,
@@ -70,7 +71,7 @@ def send_message(message, bot_client):
 
 def main():
     # проинициализировать бота здесь
-    logger.debug(f'Начало работы')
+    logger.debug('Начало работы')
     bot_client = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())  # начальное значение timestamp
 
@@ -85,10 +86,9 @@ def main():
                 send_message('Ошибка ответа сервера', bot_client)
             current_timestamp = new_homework.get(
                 'current_date',
-                current_timestamp
+                current_timestamp,
             )
-            time.sleep(SERVER_POLLING)  
-            
+            time.sleep(SERVER_POLLING)
 
         except Exception as e:
             send_message(f'Ошибка: {e}', bot_client)
