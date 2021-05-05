@@ -14,7 +14,10 @@ PRAKTIKUM_TOKEN = os.environ['PRAKTIKUM_TOKEN']
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 API_HOMEWORK = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
-SERVER_POLLING = 300   # опрашивать раз в пять минут
+SERVER_POLLING = 60 * 5
+EXEPTION_TIME_SLEEP = 5
+MAX_EXEPTIONS_TIME_SLEEP = 60 * 10
+MAX_EXEPTIONS = 10
 LOG_FILE_FORMAT = '%(asctime)s, %(levelname)s, %(name)s, %(message)s'
 
 logging.basicConfig(
@@ -49,8 +52,6 @@ def parse_homework_status(homework):
     elif homework_status not in homework_status_options:
         logger.error(log_error)
         return 'Неизвестный статус домашнего задания.'
-    else:
-        return 'Со мной что-то не так, я заболел.'
 
 
 def get_homework_statuses(current_timestamp):
@@ -62,6 +63,8 @@ def get_homework_statuses(current_timestamp):
         headers=headers,
     )
     logger.info(f'Ответ сервера: {homework_statuses.json()}')
+    if homework_statuses is None:
+        return {}
     return homework_statuses.json()
 
 
@@ -70,16 +73,17 @@ def send_message(message, bot_client):
 
 
 def main():
-    # проинициализировать бота здесь
     logger.debug('Начало работы')
     bot_client = telegram.Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())  # начальное значение timestamp
-
+    current_timestamp = int(time.time())
+    exceptions = 0
     while True:
         try:
             new_homework = get_homework_statuses(current_timestamp)
-            message = parse_homework_status(new_homework.get('homeworks')[0])
             if new_homework.get('homeworks'):
+                message = parse_homework_status(
+                    new_homework.get('homeworks')[0]
+                )
                 send_message(message, bot_client)
                 logger.info(f'Отправка сообщения: {message}')
             else:
@@ -88,11 +92,17 @@ def main():
                 'current_date',
                 current_timestamp,
             )
+            if type(current_timestamp) is not int:
+                current_timestamp = int(time.time())
             time.sleep(SERVER_POLLING)
 
         except Exception as e:
             send_message(f'Ошибка: {e}', bot_client)
-            time.sleep(5)
+            time.sleep(EXEPTION_TIME_SLEEP)
+            exceptions += 1
+            if exceptions == MAX_EXEPTIONS:
+                exceptions = 0
+                time.sleep(MAX_EXEPTIONS_TIME_SLEEP)
 
 
 if __name__ == '__main__':
