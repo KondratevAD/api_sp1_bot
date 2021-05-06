@@ -14,6 +14,7 @@ PRAKTIKUM_TOKEN = os.environ['PRAKTIKUM_TOKEN']
 TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
 TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 API_HOMEWORK = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
+AUTHORIZATION_TOKEN = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
 SERVER_POLLING = 60 * 5
 EXEPTION_TIME_SLEEP = 5
 MAX_EXEPTIONS_TIME_SLEEP = 60 * 10
@@ -30,6 +31,14 @@ handler = RotatingFileHandler('main.log', maxBytes=50000000, backupCount=5)
 formatter = logging.Formatter(LOG_FILE_FORMAT)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+Key = {
+    'Токен API': PRAKTIKUM_TOKEN,
+    'Токен Telegram': TELEGRAM_TOKEN,
+    'ID чата': TELEGRAM_CHAT_ID,
+}
+for key, value in Key.items():
+    if type(value) is not str:
+        logger.error(f'Ошибка значения переменной: {key} = {value}')
 
 
 def parse_homework_status(homework):
@@ -56,14 +65,16 @@ def parse_homework_status(homework):
 
 def get_homework_statuses(current_timestamp):
     data = {"from_date": current_timestamp}
-    headers = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
+    headers = AUTHORIZATION_TOKEN
     homework_statuses = requests.get(
         API_HOMEWORK,
         params=data,
         headers=headers,
     )
     logger.info(f'Ответ сервера: {homework_statuses.json()}')
-    if homework_statuses is None:
+    status_code = homework_statuses.status_code
+    if (homework_statuses is None
+            or str(status_code)[0] == '4'):
         return {}
     return homework_statuses.json()
 
