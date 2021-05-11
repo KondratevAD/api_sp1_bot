@@ -9,16 +9,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 LOG_FILE_FORMAT = '%(asctime)s, %(levelname)s, %(name)s, %(message)s'
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format=LOG_FILE_FORMAT,
-)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-handler = RotatingFileHandler('main.log', maxBytes=50000000, backupCount=5)
+handler = RotatingFileHandler(
+    filename=os.path.expanduser('~/main.log'),
+    maxBytes=50000000,
+    backupCount=5
+)
 formatter = logging.Formatter(LOG_FILE_FORMAT)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -28,22 +27,22 @@ try:
     TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
     TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
 except KeyError as e:
-    logger.error(e)
+    logger.error(f'Ошибка значения переменной: {e}')
 API_HOMEWORK = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
 AUTHORIZATION_TOKEN = {"Authorization": f"OAuth {PRAKTIKUM_TOKEN}"}
 SERVER_POLLING = 60 * 5
 EXEPTION_TIME_SLEEP = 5
 MAX_EXEPTIONS_TIME_SLEEP = 60 * 10
 MAX_EXEPTIONS = 10
+HOMEWORK_STATUS_OPTIONS = {
+    'reviewing': 'Работа взята на проверку.',
+    'approved': 'Ревьюеру всё понравилось, '
+                'можно приступать к следующему уроку.',
+    'rejected': 'К сожалению в работе нашлись ошибки.'
+}
 
 
 def parse_homework_status(homework):
-    homework_status_options = {
-        'reviewing': 'Работа взята на проверку.',
-        'approved': 'Ревьюеру всё понравилось, '
-                    'можно приступать к следующему уроку.',
-        'rejected': 'К сожалению в работе нашлись ошибки.'
-    }
 
     try:
         homework_name = homework.get('homework_name')
@@ -51,11 +50,11 @@ def parse_homework_status(homework):
         log_error = (f'Имя работы: {homework_name}',
                      f'статус работы: {homework_status}')
         if homework_name is not None:
-            if homework_status in homework_status_options:
-                verdict = homework_status_options[homework_status]
+            if homework_status in HOMEWORK_STATUS_OPTIONS:
+                verdict = HOMEWORK_STATUS_OPTIONS[homework_status]
                 return (f'У вас проверили работу "{homework_name}"!\n\n'
                         f'{verdict}')
-            elif homework_status not in homework_status_options:
+            elif homework_status not in HOMEWORK_STATUS_OPTIONS:
                 logger.error(log_error)
                 return 'Неизвестный статус домашнего задания.'
         else:
@@ -67,23 +66,23 @@ def parse_homework_status(homework):
 
 
 def get_homework_statuses(current_timestamp):
-    data = {"from_date": current_timestamp}
-    headers = AUTHORIZATION_TOKEN
+    attribute = dict(
+        url=API_HOMEWORK,
+        headers=AUTHORIZATION_TOKEN,
+        params={"from_date": current_timestamp},
+    )
+    log_error = (
+        'Ошибка ответа сервера\n'
+        'Адрес запроса: %(url)s\n'
+        'Заголовок запроса: %(headers)s\n'
+        'Параметры запроса: %(params)s'
+    )
     try:
-        homework_statuses = requests.get(
-            API_HOMEWORK,
-            params=data,
-            headers=headers,
-        )
+        homework_statuses = requests.get(**attribute)
         logger.info(f'Ответ сервера: {homework_statuses.json()}')
         return homework_statuses.json()
-    except ConnectionError as e:
-        logger.error(
-            f'Ошибка ответа сервера: {e}\n'
-            f'Адрес запроса: {API_HOMEWORK}\n'
-            f'Заголовок запроса: {headers}\n'
-            f'Параметры запроса: {data}'
-        )
+    except Exception:
+        logger.error(log_error, attribute)
         return {}
 
 
@@ -129,4 +128,8 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format=LOG_FILE_FORMAT,
+    )
     main()
