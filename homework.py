@@ -73,16 +73,16 @@ def get_homework_statuses(current_timestamp):
     )
     log_error = (
         'Ошибка ответа сервера\n'
-        'Адрес запроса: %(url)s\n'
-        'Заголовок запроса: %(headers)s\n'
-        'Параметры запроса: %(params)s'
+        'Адрес запроса: {url}\n'
+        'Заголовок запроса: {headers}\n'
+        'Параметры запроса: {params}'
     )
     try:
         homework_statuses = requests.get(**attribute)
         logger.info(f'Ответ сервера: {homework_statuses.json()}')
         return homework_statuses.json()
     except Exception:
-        logger.error(log_error, attribute)
+        logger.error(log_error.format(**attribute))
         return {}
 
 
